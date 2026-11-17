@@ -2,7 +2,7 @@
 
 ## Automated checks
 
-`node --test ChromeExtension/tests/*.test.mjs`: 24 passing tests in version 1.1.0. Regression cases were observed failing before fixing stale section inheritance, bracket-prefixed TXT rejection, scan/Resume replacement, path traversal identifiers, renamed-save collisions and the completed-unit status after switching units.
+`node --test tests/*.test.mjs`: 24 passing tests in version 1.1.0. Regression cases were observed failing before fixing stale section inheritance, bracket-prefixed TXT rejection, scan/Resume replacement, path traversal identifiers, renamed-save collisions and the completed-unit status after switching units.
 
 The Mac app's full `./test.sh` also completed successfully. It emits existing Security framework deprecation warnings. The persistence suite deliberately exercises a failed-save path and then passes its recovery assertions. No live API key was read or modified.
 

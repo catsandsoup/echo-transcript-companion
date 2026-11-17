@@ -1,11 +1,11 @@
 # EchoVideo transcript companion
 
-Downloads available TXT and VTT lecture transcripts for the Sydney Canvas unit open in Chrome. It lives alongside Assignment Dates because the Mac app's Canvas API key does not authenticate the separate EchoVideo session.
+Downloads available TXT and VTT lecture transcripts for the Sydney Canvas unit open in Chrome. A standalone Chrome companion for [Assignment Dates](https://github.com/catsandsoup/whenaremyassignmentsdue_mac). It uses the authenticated EchoVideo browser session.
 
 ## Install
 
 1. In Chrome, open **Extensions → Manage Extensions**.
-2. Enable **Developer mode**, choose **Load unpacked**, and select this `ChromeExtension` folder.
+2. Enable **Developer mode**, choose **Load unpacked**, and select this repository’s folder (the folder containing `manifest.json`).
 3. Reload the Canvas page. Keep this folder in place while the extension is installed.
 
 ## Download
@@ -46,7 +46,7 @@ Clearing download history makes those saves **uncertain**, because Chrome can no
 No build step, packages, remote scripts or network test fixtures are needed.
 
 ```sh
-node --test ChromeExtension/tests/*.test.mjs
+node --test tests/*.test.mjs
 ```
 
 The tests exercise inventory traversal, deduplication, filenames, opaque IDs, content validation, per-format completion, cancellation/recovery, retry limits, pause races and stale-unit protection. Live verification results are recorded in `VERIFICATION.md` after Chrome testing.
