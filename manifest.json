@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Assignment Dates — Echo Transcripts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Save available TXT and VTT lecture transcripts from the current Sydney Canvas unit, with progress and resume.",
   "minimum_chrome_version": "120",
   "permissions": ["storage", "downloads", "alarms"],

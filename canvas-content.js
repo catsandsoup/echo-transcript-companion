@@ -16,17 +16,17 @@
       <button id="scan">Scan this unit</button><p class="muted" style="margin-top:8px">Open Recorded Lectures first. Keep this unit open while downloading.</p>
       <select id="jobs" aria-label="Echo section" hidden></select>
       <div id="job" hidden><p id="inventory"></p><progress id="progress" max="1" value="0" aria-label="Transcript files processed"></progress><p id="counts" role="status" aria-live="polite"></p><p id="message"></p>
-        <div class="actions"><button id="resume" class="primary">Download TXT + VTT</button><button id="pause">Pause</button><button id="retry">Retry missing / failed</button><button id="export">Save report</button></div>
-        <p class="muted">Completed files stay saved. Retry checks unavailable formats again. For an uncertain save, check the folder first to avoid duplicates.</p>
+        <div class="actions"><button id="resume" class="primary">Download TXT + VTT</button><button id="pause">Pause</button><button id="retry">Retry missing / failed</button><button id="folder">Open folder</button><button id="check">Check saved files</button><button id="export">Save report</button></div>
+        <p class="muted">Deleted or moved files become Missing and can be downloaded again. Chrome checks while this panel is open; detection can take about 10 seconds. If download history was cleared, check the folder before retrying.</p>
         <details id="issues"><summary>Availability and inventory notes</summary><ul id="issue-list"></ul></details>
         <details open><summary>Recordings and file status</summary><div id="records"></div></details>
       </div>
-    </div><footer>Saved under Downloads → EchoVideo Transcripts. Progress stays on this Mac. No content is uploaded.</footer>
+    </div><footer>TXT and VTT save into this unit’s folder under Downloads → EchoVideo Transcripts. Turn off Chrome’s “Ask where to save each file” for automatic saving. Progress stays on this Mac. No content is uploaded.</footer>
   </section>`;
   const $=id=>root.getElementById(id);let state=null,key='',pending=false,opened=false;
   const courseName=()=>document.querySelector('[aria-label="breadcrumbs"] a[href*="/courses/"]')?.textContent.trim() || document.title;
   const keyOf=job=>`job:${job.origin}|${job.courseId}|${job.sectionId}`;
-  const names={pending:'Pending',fetching:'Fetching',starting:'Starting save',saving:'Saving in Chrome',complete:'Saved',unavailable:'Not available',failed:'Failed',uncertain:'Check save'};
+  const names={pending:'Pending',fetching:'Fetching',starting:'Starting save',saving:'Saving in Chrome',complete:'Saved',missing:'Missing',unavailable:'Not available',failed:'Failed',uncertain:'Check save'};
   async function send(type,extra={}) {
     const response=await chrome.runtime.sendMessage({type,courseName:courseName(),key,...extra});
     if(!response?.ok)throw new Error(response?.error||'Extension unavailable. Reload this Canvas page.');return response.value;
@@ -40,10 +40,10 @@
     if(!job){$('message').textContent='';if(!pending)$('error').textContent=state.contextError;return;}
     const p=job.progress;$('inventory').textContent=`${job.inventory.lessonCount} classes · ${job.inventory.recordings.length} accessible recordings · ${p.total} requested files${job.inventory.complete?'':' · inventory needs review'}`;
     $('progress').max=Math.max(p.total,1);$('progress').value=p.settled;
-    $('counts').textContent=`${p.complete} of ${p.total} saved · ${p.unavailable} unavailable · ${p.failed+p.uncertain} need attention`;
-    $('message').textContent=job.state==='finished'?(p.complete===p.total && job.inventory.complete?'All listed transcript files saved.':'Finished checking this inventory. See unavailable files and notes below.'):job.error || (job.state==='running'?'Downloading one file at a time…':'Ready to download.');
+    $('counts').textContent=`${p.complete} of ${p.total} saved · ${p.unavailable} unavailable · ${p.missing||0} missing · ${p.failed+p.uncertain} need attention`;
+    $('message').textContent=job.state==='finished'?(p.complete===p.total && job.inventory.complete?'All listed transcripts saved. Checking for deleted or moved files while this panel is open.':(p.missing?'Files are missing from their saved locations. Choose Retry missing / failed.':'Finished checking this inventory. See unavailable files and notes below.')):job.error || (job.state==='running'?'Downloading one file at a time…':'Ready to download.');
     $('resume').textContent=job.state==='ready'?'Download TXT + VTT':'Resume';$('resume').disabled=pending||job.state==='running'||!job.tasks.some(t=>['pending','fetching'].includes(t.status));
-    $('pause').disabled=pending||job.state!=='running';$('retry').disabled=pending||job.state==='running'||!job.tasks.some(t=>['failed','unavailable','uncertain'].includes(t.status));$('export').disabled=pending;
+    $('pause').disabled=pending||job.state!=='running';$('retry').disabled=pending||job.state==='running'||!job.tasks.some(t=>['failed','unavailable','uncertain','missing'].includes(t.status));$('export').disabled=pending;$('check').disabled=pending;$('folder').disabled=pending||!p.complete;$('folder').title=p.complete?'Open this unit’s folder in Finder':'Available after a file has been saved in this unit’s folder';
     $('issues').hidden=!job.inventory.issues.length;$('issue-list').replaceChildren(...job.inventory.issues.map(text=>{const li=document.createElement('li');li.textContent=text;return li;}));
     const groups=new Map();for(const task of job.tasks){if(!groups.has(task.recording.mediaId))groups.set(task.recording.mediaId,[]);groups.get(task.recording.mediaId).push(task);}
     $('records').replaceChildren(...[...groups.values()].map(tasks=>{const div=document.createElement('div');div.className='record';const title=document.createElement('strong');title.textContent=tasks[0].recording.title;div.append(title);const statuses=document.createElement('div');statuses.className='formats';statuses.textContent=tasks.map(t=>`${t.format.toUpperCase()}: ${names[t.status]||t.status}`).join(' · ');div.append(statuses);for(const task of tasks.filter(t=>t.error)){const reason=document.createElement('p');reason.className='reason';reason.textContent=`${task.format.toUpperCase()}: ${task.error}`;div.append(reason);}return div;}));
@@ -53,7 +53,7 @@
   function close(){opened=false;$('panel').hidden=true;$('launcher').setAttribute('aria-expanded','false');$('launcher').focus();}
   $('launcher').addEventListener('click',()=>opened?close():show());$('close').addEventListener('click',close);root.addEventListener('keydown',event=>{if(event.key==='Escape')close();});
   $('jobs').addEventListener('change',()=>{key=$('jobs').value;render();});
-  for(const [id,type] of [['scan','SCAN'],['resume','RESUME'],['pause','PAUSE'],['retry','RETRY'],['export','EXPORT']])$(id).addEventListener('click',async()=>{if(pending)return;pending=true;$('error').textContent='';render();try{state=await send(type);}catch(e){$('error').textContent=e.message;}finally{pending=false;render();}});
+  for(const [id,type] of [['scan','SCAN'],['resume','RESUME'],['pause','PAUSE'],['retry','RETRY'],['export','EXPORT'],['folder','OPEN_FOLDER'],['check','CHECK']])$(id).addEventListener('click',async()=>{if(pending)return;pending=true;$('error').textContent='';render();try{state=await send(type);}catch(e){$('error').textContent=e.message;}finally{pending=false;render();}});
   chrome.runtime.onMessage.addListener((message,sender,reply)=>{if(sender.id===chrome.runtime.id && message.type==='SHOW_PANEL'){show();reply({ok:true});}});
   setInterval(()=>{if(opened)void refresh();},2000);void refresh();
 })();

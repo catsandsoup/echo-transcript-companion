@@ -1,4 +1,5 @@
 import {parseInventory, transcriptPath, dataURL, safeName} from './core.mjs';
+import {openUnitFolder} from './downloads.mjs';
 import {createJob, TranscriptQueue, progress, assertReplaceable} from './queue.mjs';
 
 const queues=new Map(),contexts=new Map(),labels=new Map();
@@ -73,7 +74,8 @@ async function drive() {
   if(queue.job.state==='running' || queue.job.tasks.some(t=>t.status==='saving')) setTimeout(drive,500);
 }
 chrome.alarms.onAlarm.addListener(alarm=>{if(alarm.name==='echo-transcript-queue')void drive();});
-chrome.downloads.onChanged.addListener(()=>void drive());
+chrome.downloads.onChanged.addListener(delta=>{void (async()=>{await ready;for(const queue of queues.values())await queue.downloadChanged(delta);await drive();})();});
+chrome.downloads.onErased.addListener(id=>{void (async()=>{await ready;for(const queue of queues.values())await queue.downloadErased(id);})();});
 chrome.runtime.onStartup.addListener(()=>void drive());
 chrome.tabs.onRemoved.addListener(tabId=>{contexts.delete(tabId);void chrome.storage.session.remove(`context:${tabId}`);});
 
@@ -81,7 +83,9 @@ async function stateFor(tabId) {
   const tab=await chrome.tabs.get(tabId),courseId=courseOf(tab.url);
   if(!courseId)throw new Error('Open Recorded Lectures inside a Sydney Canvas unit.');
   let context=null,contextError='';try{context=await liveContext(tabId,{courseId});}catch(e){contextError=e.message;}
-  const jobs=[...queues.values()].filter(q=>q.job.courseId===courseId).map(q=>({...q.job,progress:progress(q.job)}));
+  const matching=[...queues.values()].filter(q=>q.job.courseId===courseId);
+  await Promise.all(matching.map(queue=>queue.checkSavedFiles()));
+  const jobs=matching.map(q=>({...q.job,progress:progress(q.job)}));
   return {courseId,courseName:labels.get(tabId)||context?.courseName||`Canvas ${courseId}`,context,contextError,jobs};
 }
 
@@ -103,6 +107,7 @@ async function handle(message,sender) {
   if(message.type==='SCAN') {
     const tab=await chrome.tabs.get(tabId);const courseId=courseOf(tab.url);const context=await liveContext(tabId,{courseId});
     const old=queues.get(keyFor(context));
+    if(old)await old.checkSavedFiles();
     assertReplaceable(old,queues.get(keyFor(context)));
     const payload=(await request(context,`/section/${encodeURIComponent(context.sectionId)}/syllabus`)).json;
     const inventory=parseInventory(payload,context.sectionId);
@@ -116,10 +121,15 @@ async function handle(message,sender) {
   if(!queue || courseOf((await chrome.tabs.get(tabId)).url)!==queue.job.courseId)throw new Error('This queue belongs to another unit. Open that unit to continue.');
   if(message.type==='PAUSE') await queue.pause();
   else if(message.type==='RESUME' || message.type==='RETRY') {
+    await queue.checkSavedFiles();
     const context=await liveContext(tabId,queue.job);queue.job.sourceTabId=tabId;
     if(context.origin!==queue.job.origin)throw new Error('Echo origin changed; scan this unit again.');
     const previous=queues.get(activeKey);if(previous && previous!==queue){await previous.pause('Paused while another unit downloads.');if(previous.busy||previous.job.tasks.some(t=>['starting','saving'].includes(t.status)))throw new Error('Another unit is finishing a file. Try again in a moment.');}
     activeKey=message.key;await chrome.storage.local.set({activeKey});await queue.resume({retryFailed:message.type==='RETRY'});void drive();
+  } else if(message.type==='CHECK') {
+    await queue.checkSavedFiles();
+  } else if(message.type==='OPEN_FOLDER') {
+    await queue.checkSavedFiles();await openUnitFolder(queue.job,chrome.downloads,chrome.runtime.id);
   } else if(message.type==='EXPORT') {
     const text=JSON.stringify({...queue.job,sourceTabId:undefined,documentId:undefined,route:undefined},null,2);
     await chrome.downloads.download({url:dataURL(text,'json'),filename:`EchoVideo Transcripts/${safeName(queue.job.courseName,60)}-download-report.json`,saveAs:false,conflictAction:'uniquify'});

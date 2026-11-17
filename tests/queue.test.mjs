@@ -25,7 +25,7 @@ test('ambiguous save intent never automatically retries and missing file is expl
   await s.queue.recover(); assert.equal(s.queue.job.tasks[0].status,'uncertain'); assert.equal(s.count,0);
   s.queue.job.tasks[1].status='saving';s.queue.job.tasks[1].downloadId=99;
   s.downloads.set(99,{id:99,state:'complete',exists:false}); await s.queue.recover();
-  assert.equal(s.queue.job.tasks[1].status,'failed');
+  assert.equal(s.queue.job.tasks[1].status,'missing');
 });
 test('pause during fetch prevents a new browser download; resume preserves completed files',async()=>{
   let release;const s=setup({fetchRecord:()=>new Promise(resolve=>{release=resolve;})});
@@ -65,4 +65,50 @@ test('switching away from a completed unit keeps it finished',async()=>{
   const s=setup();await s.queue.resume();await s.queue.step();await s.queue.step();await s.queue.step();
   await s.queue.pause('Another unit is downloading');
   assert.equal(s.queue.job.state,'finished');assert.equal(s.queue.job.error,'');
+});
+
+test('completed files are rechecked without restarting; deleted formats become retryable',async()=>{
+  const s=setup();await s.queue.resume();await s.queue.step();await s.queue.step();await s.queue.step();
+  s.downloads.get(s.queue.job.tasks[0].downloadId).exists=false;
+  await s.queue.checkSavedFiles();
+  assert.equal(s.queue.job.tasks[0].status,'missing');assert.equal(s.queue.job.tasks[1].status,'complete');
+  assert.equal(module.progress(s.queue.job).complete,1);assert.equal(module.progress(s.queue.job).missing,1);
+  await s.queue.resume({retryFailed:true});await s.queue.step();await s.queue.step();
+  assert.equal(s.count,3);assert.equal(module.progress(s.queue.job).complete,2);
+});
+test('delayed Chrome deletion event overrides a cached positive search result',async()=>{
+  const s=setup();await s.queue.resume();await s.queue.step();await s.queue.step();await s.queue.step();
+  const first=s.queue.job.tasks[0];
+  await s.queue.checkSavedFiles();assert.equal(first.status,'complete');
+  await s.queue.downloadChanged({id:first.downloadId,exists:{current:false}});
+  assert.equal(first.status,'missing');assert.equal(s.count,2);
+  // A stale query result must never resurrect a known deleted file.
+  await s.queue.checkSavedFiles();assert.equal(first.status,'missing');
+});
+test('erased download history is uncertain, never falsely saved or automatically redownloaded',async()=>{
+  const s=setup();await s.queue.resume();await s.queue.step();await s.queue.step();await s.queue.step();
+  s.downloads.delete(s.queue.job.tasks[0].downloadId);await s.queue.checkSavedFiles();
+  assert.equal(s.queue.job.tasks[0].status,'uncertain');assert.equal(s.count,2);
+});
+test('completed files saved outside the unit folder cannot count as successful',async()=>{
+  const s=setup();await s.queue.resume();await s.queue.step();
+  const first=s.queue.job.tasks[0];s.downloads.get(first.downloadId).filename='/Downloads/'+first.filename.split('/').at(-1);
+  await s.queue.step();assert.equal(first.status,'failed');assert.match(first.error,/unit folder/);
+});
+test('a stale search cannot undo a retry after deletion',async()=>{
+  const s=setup();await s.queue.resume();await s.queue.step();await s.queue.pause();
+  const task=s.queue.job.tasks[0],oldId=task.downloadId;let release;
+  s.adapters.findDownload=()=>new Promise(resolve=>{release=resolve;});
+  const step=s.queue.step();while(!release)await new Promise(resolve=>setImmediate(resolve));
+  await s.queue.downloadChanged({id:oldId,exists:{current:false}});await s.queue.resume({retryFailed:true});await s.queue.pause();
+  release([{id:oldId,state:'complete',exists:false}]);await step;
+  assert.equal(task.status,'pending');assert.equal(task.downloadId,null);
+});
+test('a stale search cannot restore saved status after history was erased',async()=>{
+  const s=setup();await s.queue.resume();await s.queue.step();await s.queue.step();await s.queue.step();
+  const task=s.queue.job.tasks[0],oldItem=s.downloads.get(task.downloadId);let release;
+  const find=s.adapters.findDownload;s.adapters.findDownload=t=>t===task?new Promise(resolve=>{release=resolve;}):find(t);
+  const check=s.queue.checkSavedFiles();while(!release)await new Promise(resolve=>setImmediate(resolve));
+  await s.queue.downloadErased(task.downloadId);release([oldItem]);await check;
+  assert.equal(task.status,'uncertain');
 });

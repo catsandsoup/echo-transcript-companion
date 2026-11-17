@@ -12,15 +12,22 @@ Downloads available TXT and VTT lecture transcripts for the Sydney Canvas unit o
 
 1. Open a unit's **Recorded Lectures** class list. If a recording is already open, use Echo's **Back** button first.
 2. Click **Lecture transcripts** at the bottom right, then **Scan this unit**.
-3. Click **Download TXT + VTT**. Files are grouped under `Downloads/EchoVideo Transcripts/<unit> [section identifier]/`.
+3. For automatic saving, turn off Chrome **Settings → Downloads → Ask where to save each file before downloading**. This is a Chrome-wide preference.
+4. Click **Download TXT + VTT**. Files are grouped under `Downloads/EchoVideo Transcripts/<unit> [section identifier]/`.
 
 Names include the class date, class title, a stable media suffix and a save-attempt suffix. Split lectures and repeated titles remain distinct. A repeated publication of the same media produces one pair of files and retains all class references in the report.
 
-**Pause** stops new work after the current browser save. **Resume** continues pending work, preserving saved files. **Retry missing / failed** retries failed, unavailable and uncertain items; check the folder before retrying an uncertain save. **Scan this unit** refreshes the available inventory and preserves completed outcomes for media still present. Use **Save report** for a local JSON inventory and per-file result.
+**Pause** stops new work after the current browser save. **Resume** continues pending work, preserving saved files. **Retry missing / failed** retries deleted/moved, failed, unavailable and uncertain items; check the folder before retrying an uncertain save. **Scan this unit** refreshes the available inventory and preserves completed outcomes for media still present. **Open folder** reveals a saved transcript inside this unit’s folder in Finder. It becomes available after the first successful save. Use **Save report** for a local JSON inventory and per-file result.
 
-Chrome may display Save dialogs depending on the browser's configuration. A file is counted as saved only when Chrome reports completion. Cancelling a dialog leaves a retryable failure. Keep the source unit open; if its frame or session disappears, reopen its class list and Resume. Only one unit downloads at a time. Progress survives extension/service-worker restarts; complete browser restarts can require reopening the unit and clicking Resume.
+Chrome’s **Ask where to save each file** setting can still request dialogs even with the extension’s `saveAs:false`. Turn it off for unattended batches. A file is counted as saved only when Chrome reports completion. Cancelling a dialog leaves a retryable failure. Keep the source unit open; if its frame or session disappears, reopen its class list and Resume. Only one unit downloads at a time. Progress survives extension/service-worker restarts; complete browser restarts can require reopening the unit and clicking Resume.
 
-Keep the proposed filename in Save dialogs. A changed name or collision is flagged for retry; the report records the actual chosen path. Choosing another folder is supported, so check the report if a file is outside its proposed unit folder.
+Keep the proposed filename in Save dialogs. A changed name or collision is flagged for retry; the report records the actual chosen path. Saving outside the proposed unit folder is flagged as failed so it can be retried into the correct folder.
+
+## Deleted or moved files
+
+The panel rechecks completed download IDs while open and before scanning, retrying or opening the folder. Chrome’s `exists` value is cached; its asynchronous deletion checks can take about ten seconds. **Check saved files** requests a check, and the panel keeps polling for updates. A detected deletion changes the format to **Missing**, lowers the saved count and enables **Retry missing / failed**. Intact completed files are retained.
+
+Clearing download history makes those saves **uncertain**, because Chrome can no longer verify their location. Check the folder before retrying to avoid duplicates. Checks confirm Chrome’s recorded file existence, not current file contents or a cryptographic integrity audit.
 
 ## Scope and privacy
 

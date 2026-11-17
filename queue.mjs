@@ -6,7 +6,7 @@ export function createJob(context, inventory) {
 }
 
 export class TranscriptQueue {
-  constructor(job, adapters) { this.job=job;this.a=adapters;this.busy=false;this.generation=0;this.writes=Promise.resolve(); }
+  constructor(job, adapters) { this.job=job;this.a=adapters;this.busy=false;this.generation=0;this.writes=Promise.resolve();this.deletedIds=new Set();this.checking=null; }
   persist() {
     this.job.updatedAt=this.a.now(); const snapshot=structuredClone(this.job);
     this.writes=this.writes.then(()=>this.a.persist(snapshot)); return this.writes;
@@ -14,21 +14,54 @@ export class TranscriptQueue {
   hasUnfinishedWork() {return this.job.tasks.some(t=>['pending','fetching','starting','saving'].includes(t.status));}
   async pause(reason='Paused. Resume when you are ready.') { this.generation++;this.job.state=this.hasUnfinishedWork()?'paused':'finished';this.job.error=this.hasUnfinishedWork()?reason:'';await this.persist(); }
   async resume({retryFailed=false}={}) {
-    if (retryFailed) for(const task of this.job.tasks) if(['failed','unavailable','uncertain'].includes(task.status)) Object.assign(task,{status:'pending',attempts:0,nextAt:0,error:'',downloadId:null,intent:null,savedFilename:null});
+    if (retryFailed) for(const task of this.job.tasks) if(['failed','unavailable','uncertain','missing'].includes(task.status)) Object.assign(task,{status:'pending',attempts:0,nextAt:0,error:'',downloadId:null,intent:null,savedFilename:null});
     this.job.state='running';this.job.error='';await this.persist();
   }
   async reconcile(task) {
+    const {downloadId,intent,status}=task;
     const matches=await this.a.findDownload(task);
+    // A deletion event, cleared history or explicit retry can supersede this
+    // search while Chrome is answering. Never revive the older attempt.
+    if(task.downloadId!==downloadId || task.intent!==intent || task.status!==status)return;
     if (matches.length!==1) {
       task.status='uncertain';task.error='Save could not be reconciled. Check the output folder before choosing Retry missing / failed.'; return;
     }
     const item=matches[0];task.downloadId=item.id;
+    if(this.deletedIds.has(item.id) || item.exists===false){this.markMissing(task);return;}
     if(item.state==='complete' && item.exists!==false) {
       task.status='complete';task.error='';task.savedFilename=item.filename;
       if(typeof item.fileSize==='number' && item.fileSize>=0 && item.fileSize!==task.bytes) {task.status='failed';task.error='Saved file size does not match the validated transcript. Retry this file.';}
     }
-    else if(item.state==='interrupted' || item.exists===false) { task.status='failed';task.error=item.exists===false?'Previously saved file is missing.':`Chrome interrupted the save: ${item.error || 'unknown reason'}`; }
+    else if(item.state==='interrupted') { task.status='failed';task.error=`Chrome interrupted the save: ${item.error || 'unknown reason'}`; }
     else { task.status='saving';task.error=item.paused?'Chrome download is paused; resume it in Chrome.':''; }
+  }
+  markMissing(task) {
+    this.deletedIds.add(task.downloadId);task.status='missing';
+    task.error='File was deleted or moved from its saved location. Retry missing / failed to download it again.';
+  }
+  async downloadChanged(delta) {
+    if(delta.exists?.current!==false)return;
+    this.deletedIds.add(delta.id);
+    const tasks=this.job.tasks.filter(t=>t.downloadId===delta.id && ['complete','starting','saving'].includes(t.status));
+    for(const task of tasks)this.markMissing(task);
+    if(tasks.length)await this.persist();
+  }
+  async downloadErased(id) {
+    const tasks=this.job.tasks.filter(t=>t.downloadId===id && ['complete','starting','saving'].includes(t.status));
+    for(const task of tasks){task.status='uncertain';task.error='Chrome download history was cleared. Check the folder before retrying; the file may still exist.';}
+    if(tasks.length)await this.persist();
+  }
+  async checkSavedFiles() {
+    if(this.checking)return this.checking;
+    this.checking=(async()=>{
+      const before=JSON.stringify(this.job.tasks);
+      // search() starts Chrome's asynchronous existence check. Later onChanged
+      // events are authoritative; a cached positive result is not a disk audit.
+      for(const task of this.job.tasks)if(task.status==='complete')await this.reconcile(task);
+      this.verifySavedNames();
+      if(before!==JSON.stringify(this.job.tasks))await this.persist();
+    })();
+    try{await this.checking;}finally{this.checking=null;}
   }
   async recover() {
     for(const task of this.job.tasks) {
@@ -45,6 +78,7 @@ export class TranscriptQueue {
       const name=String(task.savedFilename||'').replaceAll('\\','/');
       const previous=paths.get(name);paths.set(name,task);
       if(previous)for(const affected of [previous,task]) {affected.status='failed';affected.error='Two transcripts were saved to the same path; one may have replaced the other. Retry both files.';}
+      else if(!('/'+name).includes('/'+task.baseFilename.slice(0,task.baseFilename.lastIndexOf('/')+1))) {task.status='failed';task.error='Chrome saved this file outside its unit folder. Retry to save it in the unit folder.';}
       else if(!name.split('/').at(-1).includes(`[${task.intent}]`) || !name.toLowerCase().endsWith(`.${task.format}`)) {task.status='failed';task.error='Chrome saved this file under a different name. Retry to restore its distinct transcript filename.';}
     }
   }
@@ -86,9 +120,9 @@ export class TranscriptQueue {
 }
 
 export function progress(job) {
-  const counts={complete:0,unavailable:0,failed:0,uncertain:0,pending:0,fetching:0,starting:0,saving:0};
+  const counts={complete:0,unavailable:0,failed:0,uncertain:0,missing:0,pending:0,fetching:0,starting:0,saving:0};
   for(const task of job.tasks) counts[task.status]=(counts[task.status]||0)+1;
-  return {...counts,total:job.tasks.length,settled:counts.complete+counts.unavailable+counts.failed+counts.uncertain};
+  return {...counts,total:job.tasks.length,settled:counts.complete+counts.unavailable+counts.failed+counts.uncertain+counts.missing};
 }
 
 export function assertReplaceable(expected,current) {
