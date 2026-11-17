@@ -7,11 +7,13 @@ from pathlib import Path
 import re
 import zipfile
 
-FILES = (
+RUNTIME_FILES = (
     'manifest.json', 'background.mjs', 'core.mjs', 'queue.mjs',
     'downloads.mjs', 'canvas-content.js', 'echo-content.js',
-    'popup.html', 'popup.js', 'README.md', 'INSTALL.md',
+    'popup.html', 'popup.js',
 )
+FILES = {name: name for name in RUNTIME_FILES}
+FILES['INSTALL.md'] = 'packaging/INSTALL.md'
 PRIVATE_PATTERNS = {
     'local user path': r'/Users/[^\s/]+|[A-Z]:\\Users\\',
     'email address': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b',
@@ -28,8 +30,8 @@ def package(source, output):
     if not re.fullmatch(r'\d+(?:\.\d+){1,3}', version):
         raise ValueError('Unexpected extension version')
     contents = {}
-    for name in FILES:
-        path = source / name
+    for name, source_name in FILES.items():
+        path = source / source_name
         if path.is_symlink() or not path.is_file():
             raise ValueError(f'Missing file or symbolic link: {name}')
         data = path.read_bytes()
@@ -38,6 +40,11 @@ def package(source, output):
             if re.search(pattern, text, re.IGNORECASE):
                 raise ValueError(f'Privacy review required: {label} in {name}')
         contents[name] = data
+    for name, data in contents.items():
+        if name.endswith('.md'):
+            for target in re.findall(r'\]\(([^)]+)\)', data.decode('utf-8')):
+                if not target.startswith(('https://', 'http://', '#')) and target.split('#')[0] not in contents:
+                    raise ValueError(f'Unresolved package documentation link in {name}: {target}')
     required = [manifest['background']['service_worker'], manifest['action']['default_popup']]
     required += [name for script in manifest['content_scripts'] for name in script['js']]
     for name in required:

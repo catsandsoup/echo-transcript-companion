@@ -1,59 +1,55 @@
-# EchoVideo transcript companion
+# Echo Transcript Companion
 
-Downloads available TXT and VTT lecture transcripts for the Sydney Canvas unit open in Chrome. A standalone Chrome companion for [Assignment Dates](https://github.com/catsandsoup/whenaremyassignmentsdue_mac). It uses the authenticated EchoVideo browser session.
+**Save your lecture transcripts for offline study.**
 
-## Install
+Download available EchoVideo transcripts from the Canvas unit you have open as TXT and VTT files, organised into a folder for that unit.
 
-Download the extension ZIP from [Releases](https://github.com/catsandsoup/echo-transcript-companion/releases/latest), unzip it, then follow these steps. The repository folder can also be used directly.
+**Chrome on macOS · University of Sydney Canvas · Australian EchoVideo**
 
-1. In Chrome, open **Extensions → Manage Extensions**.
-2. Enable **Developer mode**, choose **Load unpacked**, and select this repository’s folder (the folder containing `manifest.json`).
-3. Reload the Canvas page. Keep this folder in place while the extension is installed.
+**[Download for Chrome (.zip)](https://github.com/catsandsoup/echo-transcript-companion/releases/download/v1.1.0/EchoTranscriptCompanion-v1.1.0.zip)**
 
-## Download
+[Installation guide](INSTALL.md) · [Release notes](https://github.com/catsandsoup/echo-transcript-companion/releases/latest) · [Get help](docs/TROUBLESHOOTING.md)
 
-1. Open a unit's **Recorded Lectures** class list. If a recording is already open, use Echo's **Back** button first.
-2. Click **Lecture transcripts** at the bottom right, then **Scan this unit**.
-3. For automatic saving, turn off Chrome **Settings → Downloads → Ask where to save each file before downloading**. This is a Chrome-wide preference.
-4. Click **Download TXT + VTT**. Files are grouped under `Downloads/EchoVideo Transcripts/<unit> [section identifier]/`.
+![The extension panel scans an example unit with four lectures and offers eight TXT and VTT files to download.](docs/images/download-panel.jpg)
 
-Names include the class date, class title, a stable media suffix and a save-attempt suffix. Split lectures and repeated titles remain distinct. A repeated publication of the same media produces one pair of files and retains all class references in the report.
+*Actual extension interface with fictional demo data. The surrounding page is a demonstration, not a Canvas account.*
 
-**Pause** stops new work after the current browser save. **Resume** continues pending work, preserving saved files. **Retry missing / failed** retries deleted/moved, failed, unavailable and uncertain items; check the folder before retrying an uncertain save. **Scan this unit** refreshes the available inventory and preserves completed outcomes for media still present. **Open folder** reveals a saved transcript inside this unit’s folder in Finder. It becomes available after the first successful save. Use **Save report** for a local JSON inventory and per-file result.
+## From recorded lectures to a folder you can use
 
-Chrome’s **Ask where to save each file** setting can still request dialogs even with the extension’s `saveAs:false`. Turn it off for unattended batches. A file is counted as saved only when Chrome reports completion. Cancelling a dialog leaves a retryable failure. Keep the source unit open; if its frame or session disappears, reopen its class list and Resume. Only one unit downloads at a time. Progress survives extension/service-worker restarts; complete browser restarts can require reopening the unit and clicking Resume.
+- **Get both formats together.** Save readable TXT files and timestamped VTT files in one batch.
+- **Keep your place.** Follow per-file progress, pause a batch, and resume pending downloads. Retry missing or failed files while retaining completed saves.
+- **Find your transcripts quickly.** Filenames include the lecture date and title. **Open folder** reveals a saved transcript in its unit folder in Finder.
 
-Keep the proposed filename in Save dialogs. A changed name or collision is flagged for retry; the report records the actual chosen path. Saving outside the proposed unit folder is flagged as failed so it can be retried into the correct folder.
+## Start with one unit
 
-## Deleted or moved files
+1. **Install the extension.** Download and unzip the release, then load its folder in Chrome using **Extensions → Manage Extensions → Developer mode → Load unpacked**. [Step-by-step instructions →](INSTALL.md)
+2. **Open Recorded Lectures in Canvas.** Use EchoVideo’s **Back** button if you are already viewing a recording, so the class list is visible.
+3. **Scan, then download.** Open **Lecture transcripts** at the bottom right, choose **Scan this unit**, then **Download TXT + VTT**. Keep that unit open while the batch runs.
 
-The panel rechecks completed download IDs while open and before scanning, retrying or opening the folder. Chrome’s `exists` value is cached; its asynchronous deletion checks can take about ten seconds. **Check saved files** requests a check, and the panel keeps polling for updates. A detected deletion changes the format to **Missing**, lowers the saved count and enables **Retry missing / failed**. Intact completed files are retained.
+Files go to `EchoVideo Transcripts/<unit> [section suffix]/` inside Chrome’s configured download location, normally **Downloads**.
 
-Clearing download history makes those saves **uncertain**, because Chrome can no longer verify their location. Check the folder before retrying to avoid duplicates. Checks confirm Chrome’s recorded file existence, not current file contents or a cryptographic integrity audit.
+**Want automatic saving?** Turn off Chrome **Settings → Downloads → Ask where to save each file before downloading**. This changes the setting for all Chrome downloads.
 
-## Scope and privacy
+This release installs as an unpacked extension. It is not a Chrome Web Store listing, and updates are manual.
 
-- Sydney Canvas and Australian EchoVideo hosts only; no hardcoded course, section, lesson or media IDs.
-- Requests run in the authenticated Echo frame. No API key, cookie-reading permission, credential copying, server, analytics or uploads.
-- Chrome permissions: site access for Canvas/Echo, local storage for queue metadata, downloads for file saves/completion, alarms to continue a suspended queue.
-- Transcript contents are held in memory while saving, not in extension storage. Local progress records contain class names and identifiers. Removing the extension removes this progress; downloaded files remain.
-- Uses observed Echo UI endpoints, which can change. Unknown inventory shapes and continuation fields are reported explicitly. Empty, restricted, processing, missing-format and failed entries are not presented as downloaded.
-- Never answers interactive questions or changes academic content. Only formats advertised by Echo's download metadata are requested; server access rules remain authoritative.
-- Direct lesson launches without a current section link require returning to the class list. This prevents carrying a cached section into a different Canvas unit.
-- Decoded inventory/transcript responses are limited to 12 MB each. Larger responses fail explicitly.
-- The extension supports recursive embedded class lists, but live grouped/paginated sections have not been verified. A detected continuation produces an inventory warning rather than an unsupported completeness claim.
-- Release ZIPs contain only extension code and installation documentation, with no saved Canvas data, transcripts, screenshots or browser profile information. Packages use an explicit file list and include a SHA-256 checksum.
+## Your study material stays on your computer
 
-## Development and checks
+The extension uses your signed-in Canvas/EchoVideo session. No API key is required. Progress and class metadata are stored locally in Chrome; transcript files are saved to your computer. There is no analytics service or transcript upload.
 
-No build step, packages, remote scripts or network test fixtures are needed.
+The release contains code and documentation only. Product screenshots use fictional records and contain no Canvas account data.
 
-```sh
-node --test tests/*.test.mjs
-```
+## Know what is available
 
-The tests exercise inventory traversal, deduplication, filenames, opaque IDs, content validation, per-format completion, cancellation/recovery, retry limits, pause races and stale-unit protection. Live verification results are recorded in `VERIFICATION.md` after Chrome testing.
+The extension saves formats that EchoVideo offers for the recordings found by the scan. Unavailable or restricted transcripts are shown in the results. If the scan warns about an unfamiliar or additional class list, completeness is not confirmed.
 
-To build an installable release ZIP, run `python3 scripts/package-release.py --output dist`. Packaging rejects common private-data patterns and includes only the declared extension files. Review changes before publishing; pattern checks supplement review.
+Current support is University of Sydney Canvas with Australian EchoVideo hosts, tested in Chrome on macOS. This is an independent project, not an official University, Canvas or EchoVideo product.
 
-References: [Chrome content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts), [download API](https://developer.chrome.com/docs/extensions/reference/api/downloads), [service-worker lifetime](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle), [Echo transcript behavior](https://support.echo360.com/hc/en-us/articles/11077285975565-EchoVideo-Viewing-Media-Transcripts).
+## Help and project details
+
+- [Install and update](INSTALL.md)
+- [Troubleshooting and missing files](docs/TROUBLESHOOTING.md)
+- [Privacy, permissions and compatibility](docs/PRIVACY.md)
+- [Development and verification](docs/DEVELOPMENT.md)
+- [Report an issue](https://github.com/catsandsoup/echo-transcript-companion/issues) — omit private course data and transcripts.
+
+Maintained by [catsandsoup](https://github.com/catsandsoup). Works on its own or alongside [Assignment Dates](https://github.com/catsandsoup/whenaremyassignmentsdue_mac).

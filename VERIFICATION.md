@@ -4,8 +4,6 @@
 
 `node --test tests/*.test.mjs`: 24 passing tests in version 1.1.0. Regression cases were observed failing before fixing stale section inheritance, bracket-prefixed TXT rejection, scan/Resume replacement, path traversal identifiers, renamed-save collisions and the completed-unit status after switching units.
 
-The Mac app's full `./test.sh` also completed successfully. It emits existing Security framework deprecation warnings. The persistence suite deliberately exercises a failed-save path and then passes its recovery assertions. No live API key was read or modified.
-
 ## Version 1.1.0 follow-up
 
 The initial implementation only reconciled completed downloads on worker recovery. A panel refresh returned stored completion states indefinitely. Version 1.1.0 rechecks complete tasks while the panel is open and handles asynchronous `exists:false` and history-erasure events, including events racing an in-flight search. Missing files reduce the saved count and become explicitly retryable. Rescans preserve extant files and queue missing formats.
