@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Assignment Dates — Echo Transcripts",
+  "version": "1.0.0",
+  "description": "Save available TXT and VTT lecture transcripts from the current Sydney Canvas unit, with progress and resume.",
+  "minimum_chrome_version": "120",
+  "permissions": ["storage", "downloads", "alarms"],
+  "host_permissions": ["https://canvas.sydney.edu.au/*", "https://echo360.net.au/*", "https://*.echo360.net.au/*"],
+  "background": {"service_worker": "background.mjs", "type": "module"},
+  "action": {"default_popup": "popup.html", "default_title": "Echo transcript downloads"},
+  "content_scripts": [
+    {"matches": ["https://canvas.sydney.edu.au/courses/*"], "js": ["canvas-content.js"], "run_at": "document_idle"},
+    {"matches": ["https://echo360.net.au/*", "https://*.echo360.net.au/*"], "js": ["echo-content.js"], "all_frames": true, "run_at": "document_idle"}
+  ]
+}
