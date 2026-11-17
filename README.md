@@ -4,6 +4,8 @@ Downloads available TXT and VTT lecture transcripts for the Sydney Canvas unit o
 
 ## Install
 
+Download the extension ZIP from [Releases](https://github.com/catsandsoup/echo-transcript-companion/releases/latest), unzip it, then follow these steps. The repository folder can also be used directly.
+
 1. In Chrome, open **Extensions → Manage Extensions**.
 2. Enable **Developer mode**, choose **Load unpacked**, and select this repository’s folder (the folder containing `manifest.json`).
 3. Reload the Canvas page. Keep this folder in place while the extension is installed.
@@ -40,6 +42,7 @@ Clearing download history makes those saves **uncertain**, because Chrome can no
 - Direct lesson launches without a current section link require returning to the class list. This prevents carrying a cached section into a different Canvas unit.
 - Decoded inventory/transcript responses are limited to 12 MB each. Larger responses fail explicitly.
 - The extension supports recursive embedded class lists, but live grouped/paginated sections have not been verified. A detected continuation produces an inventory warning rather than an unsupported completeness claim.
+- Release ZIPs contain only extension code and installation documentation, with no saved Canvas data, transcripts, screenshots or browser profile information. Packages use an explicit file list and include a SHA-256 checksum.
 
 ## Development and checks
 
@@ -50,5 +53,7 @@ node --test tests/*.test.mjs
 ```
 
 The tests exercise inventory traversal, deduplication, filenames, opaque IDs, content validation, per-format completion, cancellation/recovery, retry limits, pause races and stale-unit protection. Live verification results are recorded in `VERIFICATION.md` after Chrome testing.
+
+To build an installable release ZIP, run `python3 scripts/package-release.py --output dist`. Packaging rejects common private-data patterns and includes only the declared extension files. Review changes before publishing; pattern checks supplement review.
 
 References: [Chrome content scripts](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts), [download API](https://developer.chrome.com/docs/extensions/reference/api/downloads), [service-worker lifetime](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle), [Echo transcript behavior](https://support.echo360.com/hc/en-us/articles/11077285975565-EchoVideo-Viewing-Media-Transcripts).

@@ -1,0 +1,3 @@
+# Source archives also omit test fixtures and local verification notes.
+/tests export-ignore
+/VERIFICATION.md export-ignore
